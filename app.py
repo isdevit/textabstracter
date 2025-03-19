@@ -96,19 +96,41 @@ def load_summarizer():
     try:
         # Using T5-large for better quality summaries
         model_name = "t5-large"
+        
+        # Add memory-efficient configurations
+        torch.cuda.empty_cache()  # Clear GPU memory if available
+        
+        # Configure model loading with memory-efficient settings
+        model_config = {
+            "force_download": False,
+            "local_files_only": False,
+            "low_cpu_mem_usage": True,
+            "device_map": "auto"  # Automatically handle device placement
+        }
+        
+        # Load tokenizer with memory-efficient settings
         tokenizer = AutoTokenizer.from_pretrained(
             model_name,
-            force_download=False,  # Use force_download=False instead of resume_download
-            local_files_only=False
+            **model_config
         )
+        
+        # Load model with memory-efficient settings
         model = AutoModelForSeq2SeqLM.from_pretrained(
             model_name,
-            force_download=False,  # Use force_download=False instead of resume_download
-            local_files_only=False
+            **model_config
         )
+        
+        # Enable memory-efficient inference
+        model.eval()  # Set model to evaluation mode
+        with torch.no_grad():  # Disable gradient computation
+            # Test model with a small input
+            test_input = tokenizer("test", return_tensors="pt", max_length=512, truncation=True)
+            model.generate(test_input["input_ids"], max_length=50)
+        
         return model, tokenizer
     except Exception as e:
         st.error(f"Error loading model: {str(e)}")
+        st.error("Please try refreshing the page or contact support if the issue persists.")
         return None, None
 
 @st.cache_resource
@@ -266,23 +288,28 @@ def generate_abstract(text, length="medium"):
                 inputs = tokenizer(input_text, return_tensors="pt", max_length=512, truncation=True)
                 
                 # Generate summary with optimized parameters for T5
-                summary_ids = model.generate(
-                    inputs["input_ids"],
-                    max_length=max_length,
-                    min_length=40,  # T5's optimal minimum length
-                    num_beams=4,    # T5's optimal beam size
-                    length_penalty=1.0,  # T5's optimal length penalty
-                    early_stopping=True,
-                    do_sample=True,  # Enable sampling for more natural text
-                    temperature=0.7,  # T5's optimal temperature
-                    top_p=0.9,       # Nucleus sampling
-                    repetition_penalty=1.2
-                )
+                with torch.no_grad():  # Disable gradient computation
+                    summary_ids = model.generate(
+                        inputs["input_ids"],
+                        max_length=max_length,
+                        min_length=40,  # T5's optimal minimum length
+                        num_beams=4,    # T5's optimal beam size
+                        length_penalty=1.0,  # T5's optimal length penalty
+                        early_stopping=True,
+                        do_sample=True,  # Enable sampling for more natural text
+                        temperature=0.7,  # T5's optimal temperature
+                        top_p=0.9,       # Nucleus sampling
+                        repetition_penalty=1.2
+                    )
                 
                 # Decode and clean up the summary
                 summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
                 if summary.strip():  # Only add non-empty summaries
                     summaries.append(summary)
+                    
+                # Clear memory after each chunk
+                torch.cuda.empty_cache()  # Clear GPU memory if available
+                
             except Exception as e:
                 st.warning(f"Error processing chunk {i+1}: {str(e)}")
                 continue
