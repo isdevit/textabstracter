@@ -181,12 +181,19 @@ def preprocess_text(text):
 def generate_abstract(text, length="medium"):
     """Generate abstractive summary using T5-large model with improved processing."""
     try:
+        # Add logging
+        st.info("Loading summarization model...")
         model, tokenizer = load_summarizer()
         if model is None or tokenizer is None:
+            st.error("Failed to load the summarization model. Please try again.")
             return "Error: Could not load the summarization model.", []
 
         # Preprocess text
+        st.info("Preprocessing text...")
         processed_text = preprocess_text(text)
+        if not processed_text:
+            st.error("No valid text to process after preprocessing.")
+            return "Error: No valid text to process.", []
         
         # Split text into smaller chunks for faster processing
         max_chunk_length = 512  # T5's optimal chunk size
@@ -195,22 +202,34 @@ def generate_abstract(text, length="medium"):
         current_length = 0
         
         # Split into sentences first
-        sentences = sent_tokenize(processed_text)
+        try:
+            sentences = sent_tokenize(processed_text)
+        except Exception as e:
+            st.error(f"Error tokenizing sentences: {str(e)}")
+            return "Error: Could not process text sentences.", []
         
         # Improved chunking strategy
         for sentence in sentences:
-            sentence_length = len(tokenizer.encode(sentence))
-            if current_length + sentence_length > max_chunk_length:
-                if current_chunk:  # Only add non-empty chunks
-                    chunks.append(' '.join(current_chunk))
-                current_chunk = [sentence]
-                current_length = sentence_length
-            else:
-                current_chunk.append(sentence)
-                current_length += sentence_length
+            try:
+                sentence_length = len(tokenizer.encode(sentence))
+                if current_length + sentence_length > max_chunk_length:
+                    if current_chunk:  # Only add non-empty chunks
+                        chunks.append(' '.join(current_chunk))
+                    current_chunk = [sentence]
+                    current_length = sentence_length
+                else:
+                    current_chunk.append(sentence)
+                    current_length += sentence_length
+            except Exception as e:
+                st.warning(f"Skipping problematic sentence: {str(e)}")
+                continue
         
         if current_chunk:
             chunks.append(' '.join(current_chunk))
+        
+        if not chunks:
+            st.error("No valid text chunks to process.")
+            return "Error: No valid text chunks to process.", []
         
         # Create progress bar
         progress_bar = st.progress(0)
@@ -221,51 +240,60 @@ def generate_abstract(text, length="medium"):
         total_chunks = len(chunks)
         
         for i, chunk in enumerate(chunks):
-            # Update progress
-            progress = (i + 1) / total_chunks
-            progress_bar.progress(progress)
-            
-            # Update status with estimated time
-            estimated_time = {
-                "short": 10,
-                "medium": 20,
-                "long": 30
-            }[length]
-            remaining_time = estimated_time * (1 - progress)
-            status_text.text(f"Processing chunk {i+1}/{total_chunks}... Estimated time remaining: {remaining_time:.1f} seconds")
-            
-            # Adjust max_length based on user preference
-            max_length = {
-                "short": 150,  # T5's optimal lengths
-                "medium": 250,
-                "long": 350
-            }[length]
-            
-            # Prepare input with T5-specific format
-            input_text = f"summarize: {chunk}"
-            inputs = tokenizer(input_text, return_tensors="pt", max_length=512, truncation=True)
-            
-            # Generate summary with optimized parameters for T5
-            summary_ids = model.generate(
-                inputs["input_ids"],
-                max_length=max_length,
-                min_length=40,  # T5's optimal minimum length
-                num_beams=4,    # T5's optimal beam size
-                length_penalty=1.0,  # T5's optimal length penalty
-                early_stopping=True,
-                do_sample=True,  # Enable sampling for more natural text
-                temperature=0.7,  # T5's optimal temperature
-                top_p=0.9,       # Nucleus sampling
-                repetition_penalty=1.2
-            )
-            
-            # Decode and clean up the summary
-            summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-            summaries.append(summary)
+            try:
+                # Update progress
+                progress = (i + 1) / total_chunks
+                progress_bar.progress(progress)
+                
+                # Update status with estimated time
+                estimated_time = {
+                    "short": 10,
+                    "medium": 20,
+                    "long": 30
+                }[length]
+                remaining_time = estimated_time * (1 - progress)
+                status_text.text(f"Processing chunk {i+1}/{total_chunks}... Estimated time remaining: {remaining_time:.1f} seconds")
+                
+                # Adjust max_length based on user preference
+                max_length = {
+                    "short": 150,  # T5's optimal lengths
+                    "medium": 250,
+                    "long": 350
+                }[length]
+                
+                # Prepare input with T5-specific format
+                input_text = f"summarize: {chunk}"
+                inputs = tokenizer(input_text, return_tensors="pt", max_length=512, truncation=True)
+                
+                # Generate summary with optimized parameters for T5
+                summary_ids = model.generate(
+                    inputs["input_ids"],
+                    max_length=max_length,
+                    min_length=40,  # T5's optimal minimum length
+                    num_beams=4,    # T5's optimal beam size
+                    length_penalty=1.0,  # T5's optimal length penalty
+                    early_stopping=True,
+                    do_sample=True,  # Enable sampling for more natural text
+                    temperature=0.7,  # T5's optimal temperature
+                    top_p=0.9,       # Nucleus sampling
+                    repetition_penalty=1.2
+                )
+                
+                # Decode and clean up the summary
+                summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+                if summary.strip():  # Only add non-empty summaries
+                    summaries.append(summary)
+            except Exception as e:
+                st.warning(f"Error processing chunk {i+1}: {str(e)}")
+                continue
         
         # Clear progress indicators
         progress_bar.empty()
         status_text.empty()
+        
+        if not summaries:
+            st.error("No valid summaries were generated.")
+            return "Error: Could not generate valid summaries.", []
         
         # Combine summaries and remove duplicates
         final_summary = " ".join(summaries)
@@ -274,27 +302,39 @@ def generate_abstract(text, length="medium"):
         seen = set()
         
         for sentence in sentences:
-            sentence = re.sub(r'[^\w\s.,!?-]', ' ', sentence)
-            sentence = ' '.join(sentence.split())
-            # Improved sentence filtering
-            if (sentence not in seen and 
-                len(sentence.split()) > 5 and  # T5's optimal minimum sentence length
-                not any(sentence in other for other in seen)):
-                unique_sentences.append(sentence)
-                seen.add(sentence)
+            try:
+                sentence = re.sub(r'[^\w\s.,!?-]', ' ', sentence)
+                sentence = ' '.join(sentence.split())
+                # Improved sentence filtering
+                if (sentence not in seen and 
+                    len(sentence.split()) > 5 and  # T5's optimal minimum sentence length
+                    not any(sentence in other for other in seen)):
+                    unique_sentences.append(sentence)
+                    seen.add(sentence)
+            except Exception as e:
+                st.warning(f"Skipping problematic sentence: {str(e)}")
+                continue
+        
+        if not unique_sentences:
+            st.error("No valid sentences in the final summary.")
+            return "Error: Could not generate valid summary sentences.", []
         
         final_summary = " ".join(unique_sentences)
         
         # Post-process the summary
-        nlp = load_spacy()
-        doc = nlp(final_summary)
-        
-        # Improved key phrase extraction
-        key_phrases = []
-        for chunk in doc.noun_chunks:
-            # Only include meaningful phrases
-            if len(chunk.text.split()) >= 2 and not any(word.is_stop for word in chunk):
-                key_phrases.append(chunk.text)
+        try:
+            nlp = load_spacy()
+            doc = nlp(final_summary)
+            
+            # Improved key phrase extraction
+            key_phrases = []
+            for chunk in doc.noun_chunks:
+                # Only include meaningful phrases
+                if len(chunk.text.split()) >= 2 and not any(word.is_stop for word in chunk):
+                    key_phrases.append(chunk.text)
+        except Exception as e:
+            st.warning(f"Error extracting key phrases: {str(e)}")
+            key_phrases = []
         
         return final_summary, key_phrases
     except Exception as e:
