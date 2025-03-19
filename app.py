@@ -95,7 +95,7 @@ if 'insights' not in st.session_state:
 def load_summarizer():
     try:
         # Using T5-large for better quality summaries
-        model_name = "t5-large"
+        model_name = "t5-base"
         
         # Add memory-efficient configurations
         torch.cuda.empty_cache()  # Clear GPU memory if available
