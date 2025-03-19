@@ -23,15 +23,26 @@ import io
 from typing import Optional
 import numpy as np
 import plotly.graph_objects as go
+import time
 
 # Download required NLTK data
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt')
-nltk.download('averaged_perceptron_tagger')
-nltk.download('maxent_ne_chunker')
-nltk.download('words')
+def download_nltk_data():
+    """Download NLTK data with retry mechanism."""
+    nltk_data = ['punkt', 'averaged_perceptron_tagger', 'maxent_ne_chunker', 'words']
+    for data in nltk_data:
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                nltk.download(data, quiet=True)
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    st.error(f"Failed to download NLTK data '{data}' after {max_retries} attempts: {str(e)}")
+                else:
+                    time.sleep(1)  # Wait before retrying
+
+# Replace the existing NLTK download code with the new function
+download_nltk_data()
 
 # Set page config
 st.set_page_config(
