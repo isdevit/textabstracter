@@ -96,8 +96,16 @@ def load_summarizer():
     try:
         # Using T5-large for better quality summaries
         model_name = "t5-large"
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            force_download=False,  # Use force_download=False instead of resume_download
+            local_files_only=False
+        )
+        model = AutoModelForSeq2SeqLM.from_pretrained(
+            model_name,
+            force_download=False,  # Use force_download=False instead of resume_download
+            local_files_only=False
+        )
         return model, tokenizer
     except Exception as e:
         st.error(f"Error loading model: {str(e)}")
