@@ -531,11 +531,7 @@ with st.sidebar:
     6. Listen to the translation
     """)
     
-    # Add clear history button
-    if st.session_state.history:
-        if st.button("🗑️ Clear History", type="primary"):
-            st.session_state.history = []
-            st.success("History cleared successfully!")
+ 
     
     # Add analysis selection in sidebar
     if 'analysis' in st.session_state and st.session_state.analysis:
@@ -564,6 +560,12 @@ with st.sidebar:
         if 'selected_analyses' in st.session_state:
             st.markdown(f"**Selected Analyses:** {len(st.session_state.selected_analyses)}/{len(analysis_options)}")
     
+       # Add clear history button
+    if st.session_state.history:
+        if st.button("🗑️ Clear History", type="primary"):
+            st.session_state.history = []
+            st.success("History cleared successfully!")
+
     # Show history
     if st.session_state.history:
         st.markdown("### 📚 History")
@@ -776,7 +778,7 @@ if uploaded_file:
                                         
                                         st.markdown(f"#### {lang_name}")
                                         formatted_translation = f'''
-                                        <div style="background-color: #008000; padding: 20px; border-radius: 5px; color: white; line-height: 1.6; margin-bottom: 10px;">
+                                        <div style="background-color:rgb(75, 75, 75); padding: 20px; border-radius: 5px; color: white; line-height: 1.6; margin-bottom: 10px;">
                                             {trans_text}
                                         </div>
                                         '''
@@ -795,7 +797,7 @@ if uploaded_file:
                                         if lang in st.session_state.audio_files:
                                             st.markdown("#### 🔊 Listen")
                                             st.markdown(f"""
-                                            <div style='background-color:rgb(25, 230, 7); padding: 15px; border-radius: 5px;'>
+                                            <div style='background-color:rgb(75, 75, 75); padding: 15px; border-radius: 5px;'>
                                                 {get_audio_player(st.session_state.audio_files[lang])}
                                             </div>
                                             """, unsafe_allow_html=True)
@@ -807,7 +809,7 @@ if uploaded_file:
                     except Exception as e:
                         st.error(f"An error occurred while generating the abstract: {str(e)}")
         
-        # Replace the AI Insights section with new insights section
+        # new insights section
         if st.session_state.current_abstract:
             st.markdown("---")
             st.subheader("📊 Text Insights")
@@ -950,7 +952,7 @@ if uploaded_file:
                                 # Split translation into paragraphs and display each
                                 translation_paragraphs = translated_text.split('. ')
                                 formatted_translation = f'''
-                                <div style="background-color: #008000; padding: 15px; border-radius: 5px;">
+                                <div style="background-color:rgb(75, 75, 75); padding: 15px; border-radius: 5px;">
                                     {translated_text}
                                 </div>
                                 '''
@@ -976,7 +978,7 @@ if uploaded_file:
                                 # Display audio player with improved styling
                                 st.markdown("### 🔊 Listen to Translation")
                                 st.markdown(f"""
-                                <div style='background-color: #008000; padding: 15px; border-radius: 5px;'>
+                                <div style='background-color:rgb(75, 75, 75); padding: 15px; border-radius: 5px;'>
                                     {get_audio_player(st.session_state.audio_files[target_lang])}
                                 </div>
                                 """, unsafe_allow_html=True)
